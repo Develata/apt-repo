@@ -1,0 +1,8 @@
+Origin: Develata
+Label: Develata
+Suite: stable
+Codename: stable
+Architectures: amd64
+Components: main
+Description: Software published by Develata
+SignWith: A09B4ADBD5865C3EA6FB7FFA451D75F9C40D5AC9

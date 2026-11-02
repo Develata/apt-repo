@@ -1,0 +1,104 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Pick up new releases of the listed projects.
+    - cron: '40 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install reprepro
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends reprepro
+
+      - id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Fetch released packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/fetch.sh "$RUNNER_TEMP/incoming" "$RUNNER_TEMP/state.json"
+
+      # Scheduled runs only redeploy when a listed release changed; pushes and manual runs
+      # always rebuild (configuration or page changes).
+      - id: compare
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}/
+        run: |
+          if [[ $GITHUB_EVENT_NAME == schedule ]] \
+            && curl -fsSL "${BASE_URL}state.json" -o "$RUNNER_TEMP/deployed.json" \
+            && cmp -s <(jq -S . "$RUNNER_TEMP/deployed.json") <(jq -S . "$RUNNER_TEMP/state.json"); then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Deployed packages are current."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import signing key
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          if [[ -z $APT_SIGNING_KEY ]]; then
+            echo "::error::The APT_SIGNING_KEY secret is not set."
+            exit 1
+          fi
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          install -d -m 700 "$GNUPGHOME"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
+          expected=$(awk '$1 == "SignWith:" { print $2 }' conf/distributions)
+          gpg --batch --list-secret-keys "$expected"
+
+      - name: Build repository
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}/
+        run: bash scripts/build.sh "$RUNNER_TEMP/incoming" "$RUNNER_TEMP/state.json" "$RUNNER_TEMP/site" "$BASE_URL"
+
+      - name: Verify signatures
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          site="$RUNNER_TEMP/site"
+          gpgv --keyring keys/develata-archive-keyring.gpg "$site/dists/stable/InRelease"
+          gpgv --keyring keys/develata-archive-keyring.gpg "$site/dists/stable/Release.gpg" "$site/dists/stable/Release"
+
+      - name: Remove signing key
+        if: always() && steps.compare.outputs.changed == 'true'
+        run: rm -rf "$RUNNER_TEMP/gnupg"
+
+      - if: steps.compare.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

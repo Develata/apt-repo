@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Develata APT Repository</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.6 system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; }
+  pre { overflow-x: auto; padding: .75rem 1rem; border-radius: 6px; background: color-mix(in srgb, currentColor 8%, transparent); }
+  code { font-family: ui-monospace, monospace; font-size: .92em; }
+</style>
+</head>
+<body>
+<h1>Develata APT Repository</h1>
+<p>Debian and Ubuntu packages of software published by <a href="https://github.com/Develata">Develata</a>, built from each project's GitHub releases. Source: <a href="https://github.com/Develata/apt-repo">Develata/apt-repo</a>.</p>
+
+<h2>Set up</h2>
+<pre><code>sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL @BASE_URL@keys/develata-archive-keyring.gpg | sudo tee /etc/apt/keyrings/develata-archive-keyring.gpg &gt; /dev/null
+curl -fsSL @BASE_URL@develata.sources | sudo tee /etc/apt/sources.list.d/develata.sources &gt; /dev/null
+sudo apt update</code></pre>
+<p>Signing key fingerprint: <code>@FINGERPRINT@</code></p>
+
+<h2>Packages</h2>
+<ul>
+@PACKAGES@
+</ul>
+<p>Install with <code>sudo apt install &lt;package&gt;</code>; later releases arrive through <code>sudo apt upgrade</code>.</p>
+</body>
+</html>
