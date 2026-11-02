@@ -17,10 +17,20 @@ while IFS= read -r source; do
   repo=$(jq -r '.repo' <<<"$source")
   release=$(gh api "repos/$repo/releases/latest")
   tag=$(jq -r '.tag_name' <<<"$release")
-  while IFS= read -r asset; do
-    digest=$(jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .digest // empty' <<<"$release")
-    if [[ -z $digest ]]; then
-      echo "error: $repo $tag has no asset $asset with a digest" >&2
+  # An asset is a name, or a list of names tried in order: a packaging revision added to a
+  # release (e.g. `-0.2.2-1.deb`) is listed first and falls back to the regular asset once a
+  # later release no longer carries it.
+  while IFS= read -r choice; do
+    asset='' digest=''
+    while IFS= read -r name; do
+      digest=$(jq -r --arg name "$name" '.assets[] | select(.name == $name) | .digest // empty' <<<"$release")
+      if [[ -n $digest ]]; then
+        asset=$name
+        break
+      fi
+    done < <(jq -r 'if type == "array" then .[] else . end' <<<"$choice")
+    if [[ -z $asset ]]; then
+      echo "error: $repo $tag has none of $choice with a digest" >&2
       exit 1
     fi
     expected=${digest#sha256:}
@@ -36,7 +46,7 @@ while IFS= read -r source; do
     echo "fetched $repo $tag $asset ($actual)"
     entries+=("$(jq -cn --arg repo "$repo" --arg tag "$tag" --arg asset "$asset" --arg sha256 "$actual" \
       '{repo: $repo, tag: $tag, asset: $asset, sha256: $sha256}')")
-  done < <(jq -r '.assets[]' <<<"$source")
+  done < <(jq -c '.assets[]' <<<"$source")
 done < <(jq -c '.[]' "$root/sources.json")
 
 printf '%s\n' "${entries[@]}" | jq -s 'sort_by(.repo, .asset)' > "$state"

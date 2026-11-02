@@ -1,6 +1,6 @@
 [
   {
     "repo": "Develata/RSS-Reader",
-    "assets": ["RSS-Reader-linux-x86_64.deb"]
+    "assets": [["RSS-Reader-linux-x86_64-0.2.2-1.deb", "RSS-Reader-linux-x86_64.deb"]]
   }
 ]

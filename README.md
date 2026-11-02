@@ -33,6 +33,8 @@ Only the latest release of each package is published; older versions stay downlo
 
 Add an entry to `sources.json` with the project repository and its `.deb` asset names, push, and check the Publish run. A project needs no secret or token of its own.
 
+An asset may also be a list of names, tried in order. This publishes a Debian packaging revision added to an existing release (same program, fixed packaging, version `X.Y.Z-1`) ahead of the regular asset, and falls back to the regular asset once a later release no longer carries the revision. RSS-Reader currently uses this for `0.2.2-1`, which fixes the desktop entry name; the stale first name can be removed after the next release.
+
 ## Signing key
 
 - The private key is the `APT_SIGNING_KEY` repository secret (ASCII-armored, no passphrase). Keep an offline backup together with its revocation certificate; losing it means every user has to import a new key.
