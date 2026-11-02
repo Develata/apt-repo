@@ -35,11 +35,15 @@ mkdir -p "$site/keys"
 cp "$root/keys/develata-archive-keyring.gpg" "$root/keys/develata-archive-keyring.asc" "$site/keys/"
 cp "$state" "$site/state.json"
 
+# Name the published architectures, so hosts with another one enabled (e.g. i386 for Steam)
+# do not request indices that do not exist and print a notice on every update.
+architectures=$(awk '$1 == "Architectures:" { $1 = ""; sub(/^ /, ""); print; exit }' "$root/conf/distributions")
 cat > "$site/develata.sources" <<EOF
 Types: deb
 URIs: $base_url
 Suites: stable
 Components: main
+Architectures: $architectures
 Signed-By: /etc/apt/keyrings/develata-archive-keyring.gpg
 EOF
 
