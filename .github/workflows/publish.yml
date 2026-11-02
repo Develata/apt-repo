@@ -31,6 +31,13 @@ jobs:
       - id: pages
         uses: actions/configure-pages@v6
 
+      # Pages may report an http:// address; users fetch the key and source file over HTTPS,
+      # so the published source must name the HTTPS address too.
+      - id: site
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: echo "base_url=https://${PAGES_URL#*://}/" >> "$GITHUB_OUTPUT"
+
       - name: Fetch released packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -40,7 +47,7 @@ jobs:
       # always rebuild (configuration or page changes).
       - id: compare
         env:
-          BASE_URL: ${{ steps.pages.outputs.base_url }}/
+          BASE_URL: ${{ steps.site.outputs.base_url }}
         run: |
           if [[ $GITHUB_EVENT_NAME == schedule ]] \
             && curl -fsSL "${BASE_URL}state.json" -o "$RUNNER_TEMP/deployed.json" \
@@ -70,7 +77,7 @@ jobs:
       - name: Build repository
         if: steps.compare.outputs.changed == 'true'
         env:
-          BASE_URL: ${{ steps.pages.outputs.base_url }}/
+          BASE_URL: ${{ steps.site.outputs.base_url }}
         run: bash scripts/build.sh "$RUNNER_TEMP/incoming" "$RUNNER_TEMP/state.json" "$RUNNER_TEMP/site" "$BASE_URL"
 
       - name: Verify signatures
